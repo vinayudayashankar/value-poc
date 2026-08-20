@@ -1,6 +1,5 @@
 name: Build and Push to JFrog Artifactory
 
-
 on:
   push:
     branches: [main]
