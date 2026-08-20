@@ -86,12 +86,7 @@ jobs:
       # ============================================
       # DOCKER LOGIN
       # ============================================
-      - name: Docker Login to JFrog
-        uses: docker/login-action@v3
-        with:
-          registry: valeodemo.jfrog.io
-          username: ${{ secrets.JFROG_USER }}
-          password: ${{ secrets.JFROG_PASSWORD }}
+      
       - name: Validate secrets
         run: |
           if [ -z "${{ secrets.JFROG_USER }}" ]; then
@@ -104,7 +99,15 @@ jobs:
             exit 1
           fi
       
-          echo "Both secrets exist"      
+          echo "Both secrets exist"           
+      
+      - name: Docker Login to JFrog
+        uses: docker/login-action@v3
+        with:
+          registry: valeodemo.jfrog.io
+          username: ${{ secrets.JFROG_USER }}
+          password: ${{ secrets.JFROG_PASSWORD }}
+ 
       # ============================================
       # BUILD JARVIS API IMAGE
       # ============================================
