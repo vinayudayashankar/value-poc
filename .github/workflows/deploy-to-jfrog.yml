@@ -10,8 +10,8 @@ on:
 env:
   JFROG_URL: https://valeodemo.jfrog.io
   DOCKER_REGISTRY: valeodemo.jfrog.io
-  DOCKER_REPO: docker-local
-  ARTIFACT_REPO: generic-local
+  DOCKER_REPO: valeo-jarvis-docker-images
+  ARTIFACT_REPO: valeo-jarvis-application-bundles
   API_IMAGE_NAME: jarvis-api
   UI_IMAGE_NAME: jarvis-ui
 
