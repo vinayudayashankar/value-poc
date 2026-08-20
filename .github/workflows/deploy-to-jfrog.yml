@@ -92,7 +92,19 @@ jobs:
           registry: valeodemo.jfrog.io
           username: ${{ secrets.JFROG_USER }}
           password: ${{ secrets.JFROG_PASSWORD }}
-
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.JFROG_USER }}" ]; then
+            echo "JFROG_USER is EMPTY"
+            exit 1
+          fi
+      
+          if [ -z "${{ secrets.JFROG_PASSWORD }}" ]; then
+            echo "JFROG_PASSWORD is EMPTY"
+            exit 1
+          fi
+      
+          echo "Both secrets exist"      
       # ============================================
       # BUILD JARVIS API IMAGE
       # ============================================
