@@ -59,7 +59,7 @@ jobs:
               "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.DOCKER_REPO }}" \
               -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
               -H "Content-Type: application/json" \
-              -d '{"key": "docker-local", "rclass": "local", "packageType": "docker", "dockerApiVersion": "V2"}'
+              -d '{"key": "${{ env.DOCKER_REPO }}", "rclass": "local", "packageType": "docker", "dockerApiVersion": "V2"}'
             echo "✅ Docker repository created"
           else
             echo "✅ Docker repository exists"
@@ -76,7 +76,7 @@ jobs:
               "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.ARTIFACT_REPO }}" \
               -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
               -H "Content-Type: application/json" \
-              -d '{"key": "generic-local", "rclass": "local", "packageType": "generic"}'
+              -d '{"key": "${{ env.ARTIFACT_REPO }}", "rclass": "local", "packageType": "generic"}'
             echo "✅ Generic repository created"
           else
             echo "✅ Generic repository exists"
@@ -265,7 +265,7 @@ jobs:
           # Update API deployment
           if [ -f "k8s/api/api-deployment.yaml" ]; then
             # Replace the image line for jarvis-api
-            sed -i "s|image: valeodemo.jfrog.io/docker-local/jarvis-api:.*|image: ${API_IMAGE}|g" k8s/api/api-deployment.yaml
+            sed -i "s|image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/jarvis-api:.*|image: ${API_IMAGE}|g" k8s/api/api-deployment.yaml
             echo "✅ Updated k8s/api/api-deployment.yaml"
             cat k8s/api/api-deployment.yaml | grep "image:"
           else
@@ -277,7 +277,7 @@ jobs:
           # Update UI deployment
           if [ -f "k8s/ui/ui-deployment.yaml" ]; then
             # Replace the image line for jarvis-ui
-            sed -i "s|image: valeodemo.jfrog.io/docker-local/jarvis-ui:.*|image: ${UI_IMAGE}|g" k8s/ui/ui-deployment.yaml
+            sed -i "s|image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/jarvis-ui:.*|image: ${UI_IMAGE}|g" k8s/ui/ui-deployment.yaml
             echo "✅ Updated k8s/ui/ui-deployment.yaml"
             cat k8s/ui/ui-deployment.yaml | grep "image:"
           else
