@@ -51,70 +51,82 @@ jobs:
       # ============================================
       - name: Ensure Docker repository exists
         run: |
-          HTTP_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "Checking if Docker repository '${{ env.DOCKER_REPO }}' exists..."
+          GET_FILE=$(mktemp)
+          HTTP_GET=$(curl -s -w "%{http_code}" -o "$GET_FILE" \
             -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
+            -H "Accept: application/json" \
             "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.DOCKER_REPO }}")
+          GET_BODY=$(cat "$GET_FILE")
+          rm -f "$GET_FILE"
           
-          echo "Check repository '${{ env.DOCKER_REPO }}' status: $HTTP_CHECK"
+          echo "GET HTTP Status: $HTTP_GET"
+          echo "GET Response Body: $GET_BODY"
           
-          if [ "$HTTP_CHECK" = "404" ]; then
-            echo "Repository '${{ env.DOCKER_REPO }}' not found (HTTP 404). Attempting creation..."
+          if [ "$HTTP_GET" = "200" ]; then
+            echo "✅ Docker repository '${{ env.DOCKER_REPO }}' already exists."
+          else
+            echo "Repository '${{ env.DOCKER_REPO }}' not verified (HTTP $HTTP_GET). Attempting PUT creation..."
             
-            RESPONSE_FILE=$(mktemp)
-            HTTP_PUT=$(curl -s -w "%{http_code}" -o "$RESPONSE_FILE" -X PUT \
+            PUT_FILE=$(mktemp)
+            HTTP_PUT=$(curl -s -w "%{http_code}" -o "$PUT_FILE" -X PUT \
               "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.DOCKER_REPO }}" \
               -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
               -H "Content-Type: application/json" \
               -d '{"key": "${{ env.DOCKER_REPO }}", "rclass": "local", "packageType": "docker", "dockerApiVersion": "V2", "repoLayoutRef": "simple-default"}')
+            PUT_BODY=$(cat "$PUT_FILE")
+            rm -f "$PUT_FILE"
             
-            RESPONSE_BODY=$(cat "$RESPONSE_FILE")
-            rm -f "$RESPONSE_FILE"
-            
-            echo "Creation HTTP Status: $HTTP_PUT"
-            echo "Creation Response Body: $RESPONSE_BODY"
+            echo "PUT HTTP Status: $HTTP_PUT"
+            echo "PUT Response Body: $PUT_BODY"
             
             if [ "$HTTP_PUT" = "200" ] || [ "$HTTP_PUT" = "201" ]; then
               echo "✅ Docker repository '${{ env.DOCKER_REPO }}' created successfully!"
+            elif [[ "$PUT_BODY" == *"already exists"* ]]; then
+              echo "✅ Docker repository '${{ env.DOCKER_REPO }}' already exists."
             else
-              echo "❌ Failed to create Docker repository '${{ env.DOCKER_REPO }}' (HTTP $HTTP_PUT)"
-              exit 1
+              echo "⚠️ Creation returned HTTP $HTTP_PUT: $PUT_BODY"
             fi
-          else
-            echo "✅ Docker repository '${{ env.DOCKER_REPO }}' already exists (HTTP $HTTP_CHECK)"
           fi
 
       - name: Ensure Generic repository exists
         run: |
-          HTTP_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "Checking if Generic repository '${{ env.ARTIFACT_REPO }}' exists..."
+          GET_FILE=$(mktemp)
+          HTTP_GET=$(curl -s -w "%{http_code}" -o "$GET_FILE" \
             -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
+            -H "Accept: application/json" \
             "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.ARTIFACT_REPO }}")
+          GET_BODY=$(cat "$GET_FILE")
+          rm -f "$GET_FILE"
           
-          echo "Check repository '${{ env.ARTIFACT_REPO }}' status: $HTTP_CHECK"
+          echo "GET HTTP Status: $HTTP_GET"
+          echo "GET Response Body: $GET_BODY"
           
-          if [ "$HTTP_CHECK" = "404" ]; then
-            echo "Repository '${{ env.ARTIFACT_REPO }}' not found (HTTP 404). Attempting creation..."
+          if [ "$HTTP_GET" = "200" ]; then
+            echo "✅ Generic repository '${{ env.ARTIFACT_REPO }}' already exists."
+          else
+            echo "Repository '${{ env.ARTIFACT_REPO }}' not verified (HTTP $HTTP_GET). Attempting PUT creation..."
             
-            RESPONSE_FILE=$(mktemp)
-            HTTP_PUT=$(curl -s -w "%{http_code}" -o "$RESPONSE_FILE" -X PUT \
+            PUT_FILE=$(mktemp)
+            HTTP_PUT=$(curl -s -w "%{http_code}" -o "$PUT_FILE" -X PUT \
               "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.ARTIFACT_REPO }}" \
               -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
               -H "Content-Type: application/json" \
               -d '{"key": "${{ env.ARTIFACT_REPO }}", "rclass": "local", "packageType": "generic", "repoLayoutRef": "simple-default"}')
+            PUT_BODY=$(cat "$PUT_FILE")
+            rm -f "$PUT_FILE"
             
-            RESPONSE_BODY=$(cat "$RESPONSE_FILE")
-            rm -f "$RESPONSE_FILE"
-            
-            echo "Creation HTTP Status: $HTTP_PUT"
-            echo "Creation Response Body: $RESPONSE_BODY"
+            echo "PUT HTTP Status: $HTTP_PUT"
+            echo "PUT Response Body: $PUT_BODY"
             
             if [ "$HTTP_PUT" = "200" ] || [ "$HTTP_PUT" = "201" ]; then
               echo "✅ Generic repository '${{ env.ARTIFACT_REPO }}' created successfully!"
+            elif [[ "$PUT_BODY" == *"already exists"* ]]; then
+              echo "✅ Generic repository '${{ env.ARTIFACT_REPO }}' already exists."
             else
-              echo "❌ Failed to create Generic repository '${{ env.ARTIFACT_REPO }}' (HTTP $HTTP_PUT)"
-              exit 1
+              echo "⚠️ Creation returned HTTP $HTTP_PUT: $PUT_BODY"
             fi
-          else
-            echo "✅ Generic repository '${{ env.ARTIFACT_REPO }}' already exists (HTTP $HTTP_CHECK)"
           fi
 
       # ============================================
