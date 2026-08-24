@@ -26,7 +26,7 @@ spec:
       containers:
         - name: jarvis-api
           # Use JFrog image - update version as needed
-          image: valeodemo.jfrog.io/valeo-jarvis-docker-images/jarvis-api:main-210a662-20260820140951
+          image: valeodemo.jfrog.io/valeo-jarvis-docker-images/jarvis-api:main-2faa39f-20260824042457
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
