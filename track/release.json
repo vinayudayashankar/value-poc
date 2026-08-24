@@ -1,6 +1,16 @@
 {
   "project": "jarvis-traceability",
   "latest_version": "V.1.0.0",
-  "last_updated": "2026-08-24T12:00:00Z",
-  "history": []
+  "last_updated": "2026-08-24T06:59:04Z",
+  "history": [
+    {
+      "version": "V.1.0.0",
+      "timestamp": "2026-08-24T06:59:04Z",
+      "git_commit": "841a4df",
+      "build_number": "13",
+      "artifactory_bundle": "valeo-jarvis-application-bundles/jarvis/V.1.0.0.zip",
+      "api_image": "valeodemo.jfrog.io/valeo-jarvis-docker-images/jarvis-api:V.1.0.0",
+      "ui_image": "valeodemo.jfrog.io/valeo-jarvis-docker-images/jarvis-ui:V.1.0.0"
+    }
+  ]
 }
