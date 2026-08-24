@@ -259,19 +259,19 @@ jobs:
           cd bundle && zip -r ../${SEMVER}.zip . && cd ..
 
       # ============================================
-      # UPLOAD ZIP TO JFROG ARTIFACTORY
+      # UPLOAD ZIP TO JFROG ARTIFACTORY (UNDER VERSION FOLDER)
       # ============================================
       - name: Upload zip bundle to JFrog
         run: |
           SEMVER="${{ steps.version.outputs.version }}"
           
           curl -s -X PUT \
-            "https://valeodemo.jfrog.io/artifactory/${{ env.ARTIFACT_REPO }}/jarvis/${SEMVER}.zip" \
+            "https://valeodemo.jfrog.io/artifactory/${{ env.ARTIFACT_REPO }}/jarvis/${SEMVER}/${SEMVER}.zip" \
             -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
             -H "Content-Type: application/zip" \
             --data-binary "@${SEMVER}.zip"
           
-          echo "✅ Zip bundle ${SEMVER}.zip uploaded to JFrog"
+          echo "✅ Zip bundle ${SEMVER}.zip uploaded to JFrog at jarvis/${SEMVER}/${SEMVER}.zip"
 
       # ============================================
       # UPDATE K8S MANIFESTS & TRACK/RELEASE.JSON IN GIT
@@ -307,7 +307,7 @@ jobs:
               'timestamp': '${{ steps.version.outputs.timestamp }}',
               'git_commit': '${{ steps.version.outputs.short_sha }}',
               'build_number': '${{ github.run_number }}',
-              'artifactory_bundle': '${{ env.ARTIFACT_REPO }}/jarvis/$SEMVER.zip',
+              'artifactory_bundle': '${{ env.ARTIFACT_REPO }}/jarvis/$SEMVER/$SEMVER.zip',
               'api_image': '$API_IMAGE',
               'ui_image': '$UI_IMAGE'
           }
@@ -342,7 +342,7 @@ jobs:
           echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}"
           echo ""
           echo "📁 Bundle Uploaded to JFrog:"
-          echo "   - ${{ env.ARTIFACT_REPO }}/jarvis/${SEMVER}.zip"
+          echo "   - ${{ env.ARTIFACT_REPO }}/jarvis/${SEMVER}/${SEMVER}.zip"
           echo ""
           echo "⚙️ Release Tracker Updated:"
           echo "   - track/release.json (GitHub)"
