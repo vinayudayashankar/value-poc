@@ -56,6 +56,7 @@ jobs:
             "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.DOCKER_REPO }}")
           
           if [ "$HTTP_CODE" = "404" ]; then
+            echo "Repository '${{ env.DOCKER_REPO }}' not found. Creating..."
             curl -s -X PUT \
               "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.DOCKER_REPO }}" \
               -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
@@ -63,7 +64,7 @@ jobs:
               -d '{"key": "${{ env.DOCKER_REPO }}", "rclass": "local", "packageType": "docker", "dockerApiVersion": "V2"}'
             echo "✅ Docker repository created"
           else
-            echo "✅ Docker repository exists"
+            echo "✅ Docker repository exists (HTTP $HTTP_CODE)"
           fi
 
       - name: Ensure Generic repository exists
@@ -73,6 +74,7 @@ jobs:
             "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.ARTIFACT_REPO }}")
           
           if [ "$HTTP_CODE" = "404" ]; then
+            echo "Repository '${{ env.ARTIFACT_REPO }}' not found. Creating..."
             curl -s -X PUT \
               "https://valeodemo.jfrog.io/artifactory/api/repositories/${{ env.ARTIFACT_REPO }}" \
               -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
@@ -80,7 +82,7 @@ jobs:
               -d '{"key": "${{ env.ARTIFACT_REPO }}", "rclass": "local", "packageType": "generic"}'
             echo "✅ Generic repository created"
           else
-            echo "✅ Generic repository exists"
+            echo "✅ Generic repository exists (HTTP $HTTP_CODE)"
           fi
 
       # ============================================
