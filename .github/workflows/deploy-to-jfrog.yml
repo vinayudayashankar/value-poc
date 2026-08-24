@@ -1,11 +1,8 @@
 name: Build and Push to JFrog Artifactory
 
-
 on:
   push:
     branches: [main]
-  # pull_request:
-  #   branches: [main]
   workflow_dispatch:
 
 env:
@@ -24,30 +21,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # Needed for git push
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Generate version tags
+      # ============================================
+      # GENERATE SEMANTIC VERSION (V.X.Y.Z)
+      # ============================================
+      - name: Determine Semantic Version
         id: version
         run: |
-          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//-/g')
+          BASE_VER=$(cat VERSION 2>/dev/null || echo "1.0.0")
+          SEMVER="V.${BASE_VER}"
           SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          VERSION="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}"
+          TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "branch=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "version=${SEMVER}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
           
+          echo "Semantic Version: ${SEMVER}"
           echo "Full Image Tags:"
-          echo "  API: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${VERSION}"
-          echo "  UI:  valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${VERSION}"
+          echo "  API: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER}"
+          echo "  UI:  valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}"
 
       # ============================================
-      # ENSURE REPOSITORIES EXIST
+      # ENSURE REPOSITORIES EXIST IN JFROG
       # ============================================
       - name: Ensure Docker repository exists
         run: |
@@ -86,97 +86,78 @@ jobs:
       # ============================================
       # DOCKER LOGIN
       # ============================================
-      
       - name: Validate secrets
         run: |
           if [ -z "${{ secrets.JFROG_USER }}" ]; then
             echo "JFROG_USER is EMPTY"
             exit 1
           fi
-      
           if [ -z "${{ secrets.JFROG_PASSWORD }}" ]; then
             echo "JFROG_PASSWORD is EMPTY"
             exit 1
           fi
-      
-          echo "Both secrets exist"           
-      
+          echo "Both secrets exist"
+
       - name: Docker Login to JFrog
         uses: docker/login-action@v3
         with:
           registry: valeodemo.jfrog.io
           username: ${{ secrets.JFROG_USER }}
           password: ${{ secrets.JFROG_PASSWORD }}
- 
+
       # ============================================
-      # BUILD JARVIS API IMAGE
+      # BUILD & PUSH DOCKER IMAGES (ONLY SEMANTIC TAG)
       # ============================================
-      - name: Build jarvis-api image
+      - name: Build and Push jarvis-api image
         run: |
+          SEMVER="${{ steps.version.outputs.version }}"
           docker build \
             -f ./src/Jarvis.Traceability.Api/Dockerfile \
-            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.version }} \
-            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:latest \
-            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.branch }} \
+            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER} \
             ./src/Jarvis.Traceability.Api
 
-      - name: Push jarvis-api image to JFrog
-        run: |
-          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.version }}
-          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:latest
-          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.branch }}
+          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER}
 
-      # ============================================
-      # BUILD JARVIS UI IMAGE
-      # ============================================
-      - name: Build jarvis-ui image
+      - name: Build and Push jarvis-ui image
         run: |
+          SEMVER="${{ steps.version.outputs.version }}"
           docker build \
             -f ./frontend/Dockerfile \
-            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.version }} \
-            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:latest \
-            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.branch }} \
+            -t valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER} \
             ./frontend
 
-      - name: Push jarvis-ui image to JFrog
-        run: |
-          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.version }}
-          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:latest
-          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.branch }}
+          docker push valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}
 
       # ============================================
-      # CREATE AND UPLOAD ARTIFACTS
+      # CREATE SINGLE ZIP BUNDLE
       # ============================================
-      - name: Create build artifacts
+      - name: Create release zip bundle
         run: |
-          mkdir -p artifacts
-          cp docker-compose.yml artifacts/
+          SEMVER="${{ steps.version.outputs.version }}"
           
-          mkdir -p artifacts/dockerfiles
-          cp ./src/Jarvis.Traceability.Api/Dockerfile artifacts/dockerfiles/jarvis-api.Dockerfile
-          cp ./frontend/Dockerfile artifacts/dockerfiles/jarvis-ui.Dockerfile
+          mkdir -p bundle/builds
+          mkdir -p bundle/configs
+          mkdir -p bundle/deployments/dockerfiles
           
-          if [ -d "./grafana" ]; then
-            cp -r ./grafana artifacts/grafana-configs
-          fi
-          
-          cat > artifacts/build-info.json << EOF
+          # 1. Builds
+          cat > bundle/builds/build-info.json << EOF
           {
-            "version": "${{ steps.version.outputs.version }}",
-            "branch": "${{ steps.version.outputs.branch }}",
+            "version": "${SEMVER}",
             "commit": "${{ github.sha }}",
             "short_sha": "${{ steps.version.outputs.short_sha }}",
             "timestamp": "${{ steps.version.outputs.timestamp }}",
             "build_number": "${{ github.run_number }}",
             "actor": "${{ github.actor }}",
             "images": {
-              "jarvis-api": "valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.version }}",
-              "jarvis-ui": "valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+              "jarvis-api": "valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER}",
+              "jarvis-ui": "valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}"
             }
           }
           EOF
-          
-          cat > artifacts/docker-compose-jfrog.yml << EOF
+
+          # 2. Configs
+          cp docker-compose.yml bundle/configs/
+          cat > bundle/configs/docker-compose-jfrog.yml << EOF
           version: '3.8'
           services:
             jarvis-db:
@@ -191,7 +172,7 @@ jobs:
               volumes:
                 - pgdata:/var/lib/postgresql/data
             jarvis-api:
-              image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.version }}
+              image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER}
               container_name: jarvis-backend-api
               ports:
                 - "5000:8080"
@@ -200,7 +181,7 @@ jobs:
               depends_on:
                 - jarvis-db
             jarvis-ui:
-              image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.version }}
+              image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}
               container_name: jarvis-react-ui
               ports:
                 - "80:80"
@@ -219,139 +200,110 @@ jobs:
           volumes:
             pgdata:
           EOF
+
+          # 3. Deployments
+          cp ./src/Jarvis.Traceability.Api/Dockerfile bundle/deployments/dockerfiles/jarvis-api.Dockerfile
+          cp ./frontend/Dockerfile bundle/deployments/dockerfiles/jarvis-ui.Dockerfile
+          if [ -d "./grafana" ]; then
+            cp -r ./grafana bundle/deployments/grafana-configs
+          fi
           
-          tar -czvf jarvis-deployment-${{ steps.version.outputs.version }}.tar.gz artifacts/
+          # Zip bundle directly as ${SEMVER}.zip
+          cd bundle && zip -r ../${SEMVER}.zip . && cd ..
 
       # ============================================
-      # UPLOAD ARTIFACTS
+      # UPLOAD ZIP TO JFROG ARTIFACTORY
       # ============================================
-      - name: Upload artifacts to JFrog
+      - name: Upload zip bundle to JFrog
         run: |
-          curl -s -X PUT \
-            "https://valeodemo.jfrog.io/artifactory/${{ env.ARTIFACT_REPO }}/jarvis/deployments/${{ steps.version.outputs.version }}/jarvis-deployment-${{ steps.version.outputs.version }}.tar.gz" \
-            -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary "@jarvis-deployment-${{ steps.version.outputs.version }}.tar.gz"
+          SEMVER="${{ steps.version.outputs.version }}"
           
           curl -s -X PUT \
-            "https://valeodemo.jfrog.io/artifactory/${{ env.ARTIFACT_REPO }}/jarvis/configs/docker-compose-jfrog.yml" \
+            "https://valeodemo.jfrog.io/artifactory/${{ env.ARTIFACT_REPO }}/jarvis/${SEMVER}.zip" \
             -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
-            -H "Content-Type: application/x-yaml" \
-            --data-binary "@artifacts/docker-compose-jfrog.yml"
+            -H "Content-Type: application/zip" \
+            --data-binary "@${SEMVER}.zip"
           
-          curl -s -X PUT \
-            "https://valeodemo.jfrog.io/artifactory/${{ env.ARTIFACT_REPO }}/jarvis/builds/${{ steps.version.outputs.version }}/build-info.json" \
-            -u "${{ secrets.JFROG_USER }}:${{ secrets.JFROG_PASSWORD }}" \
-            -H "Content-Type: application/json" \
-            --data-binary "@artifacts/build-info.json"
-          
-          echo "✅ All artifacts uploaded to JFrog"
+          echo "✅ Zip bundle ${SEMVER}.zip uploaded to JFrog"
 
       # ============================================
-      # UPDATE K8S MANIFESTS WITH NEW IMAGE TAGS
+      # UPDATE K8S MANIFESTS & TRACK/RELEASE.JSON IN GIT
       # ============================================
-      - name: Update K8s manifests with new image tags
+      - name: Update K8s manifests & track/release.json in GitHub
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          API_IMAGE="valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${VERSION}"
-          UI_IMAGE="valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${VERSION}"
+          SEMVER="${{ steps.version.outputs.version }}"
+          API_IMAGE="valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER}"
+          UI_IMAGE="valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}"
           
-          echo "============================================"
-          echo "Updating K8s manifests with new image tags"
-          echo "============================================"
-          echo "API Image: ${API_IMAGE}"
-          echo "UI Image:  ${UI_IMAGE}"
-          echo ""
-          
-          # Update API deployment
+          # Update K8s manifests
           if [ -f "k8s/api/api-deployment.yaml" ]; then
-            # Replace the image line for jarvis-api
             sed -i "s|image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/jarvis-api:.*|image: ${API_IMAGE}|g" k8s/api/api-deployment.yaml
-            echo "✅ Updated k8s/api/api-deployment.yaml"
-            cat k8s/api/api-deployment.yaml | grep "image:"
-          else
-            echo "⚠️ k8s/api/api-deployment.yaml not found"
           fi
-          
-          echo ""
-          
-          # Update UI deployment
           if [ -f "k8s/ui/ui-deployment.yaml" ]; then
-            # Replace the image line for jarvis-ui
             sed -i "s|image: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/jarvis-ui:.*|image: ${UI_IMAGE}|g" k8s/ui/ui-deployment.yaml
-            echo "✅ Updated k8s/ui/ui-deployment.yaml"
-            cat k8s/ui/ui-deployment.yaml | grep "image:"
-          else
-            echo "⚠️ k8s/ui/ui-deployment.yaml not found"
           fi
-
-      # ============================================
-      # COMMIT AND PUSH TO TRIGGER ARGOCD
-      # ============================================
-      - name: Commit and push updated manifests
-        run: |
-          # Configure Git
+          
+          # Update track/release.json
+          mkdir -p track
+          if [ ! -f "track/release.json" ]; then
+            echo '{"project":"jarvis-traceability","latest_version":"","history":[]}' > track/release.json
+          fi
+          
+          python3 -c "
+          import json
+          with open('track/release.json', 'r') as f:
+              data = json.load(f)
+          data['latest_version'] = '$SEMVER'
+          data['last_updated'] = '${{ steps.version.outputs.timestamp }}'
+          new_entry = {
+              'version': '$SEMVER',
+              'timestamp': '${{ steps.version.outputs.timestamp }}',
+              'git_commit': '${{ steps.version.outputs.short_sha }}',
+              'build_number': '${{ github.run_number }}',
+              'artifactory_bundle': '${{ env.ARTIFACT_REPO }}/jarvis/$SEMVER.zip',
+              'api_image': '$API_IMAGE',
+              'ui_image': '$UI_IMAGE'
+          }
+          # Avoid duplicate entries for same version
+          data['history'] = [e for e in data['history'] if e.get('version') != '$SEMVER']
+          data['history'].insert(0, new_entry)
+          with open('track/release.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          "
+          
+          # Commit back to GitHub
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Check if there are changes
-          if git diff --quiet k8s/; then
-            echo "⚠️ No changes to K8s manifests (image tags may already be up to date)"
-          else
-            echo "📦 Committing updated K8s manifests..."
-            
-            # Add changed files
-            git add k8s/api/api-deployment.yaml k8s/ui/ui-deployment.yaml
-            
-            # Commit with version info
-            git commit -m "ci: update image tags to ${{ steps.version.outputs.version }}
-            
-            - jarvis-api: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            - jarvis-ui: valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            
-            Build: ${{ github.run_number }}
-            Commit: ${{ github.sha }}"
-            
-            # Push to trigger ArgoCD
-            git push
-            
-            echo "✅ Pushed to Git - ArgoCD will detect changes and sync"
-          fi
+          git add k8s/ track/release.json
+          git commit -m "ci: release ${SEMVER} - update manifests & track/release.json" || echo "No changes to commit"
+          git push
 
       # ============================================
       # SUMMARY
       # ============================================
       - name: Print Summary
         run: |
+          SEMVER="${{ steps.version.outputs.version }}"
           echo "============================================"
           echo "✅ BUILD & DEPLOY TRIGGER COMPLETE"
           echo "============================================"
-          echo ""
-          echo "Version: ${{ steps.version.outputs.version }}"
-          echo "Branch: ${{ steps.version.outputs.branch }}"
-          echo "Commit: ${{ github.sha }}"
+          echo "Version: ${SEMVER}"
+          echo "Commit:  ${{ github.sha }}"
           echo ""
           echo "🐳 Docker Images Pushed:"
-          echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
-          echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
-          echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:latest"
-          echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:latest"
+          echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.API_IMAGE_NAME }}:${SEMVER}"
+          echo "   - valeodemo.jfrog.io/${{ env.DOCKER_REPO }}/${{ env.UI_IMAGE_NAME }}:${SEMVER}"
           echo ""
-          echo "📁 Artifacts Uploaded to JFrog:"
-          echo "   - ${{ env.ARTIFACT_REPO }}/jarvis/deployments/${{ steps.version.outputs.version }}/"
-          echo "   - ${{ env.ARTIFACT_REPO }}/jarvis/configs/docker-compose-jfrog.yml"
-          echo "   - ${{ env.ARTIFACT_REPO }}/jarvis/builds/${{ steps.version.outputs.version }}/build-info.json"
+          echo "📁 Bundle Uploaded to JFrog:"
+          echo "   - ${{ env.ARTIFACT_REPO }}/jarvis/${SEMVER}.zip"
           echo ""
-          echo "⚙️ K8s Manifests Updated:"
-          echo "   - k8s/api/api-deployment.yaml"
-          echo "   - k8s/ui/ui-deployment.yaml"
-          echo ""
-          echo "🔄 ArgoCD will now sync the changes!"
+          echo "⚙️ Release Tracker Updated:"
+          echo "   - track/release.json (GitHub)"
           echo "============================================"
 
       - name: Upload to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-deployment-${{ steps.version.outputs.version }}
-          path: artifacts/
+          name: jarvis-release-${{ steps.version.outputs.version }}
+          path: bundle/
           retention-days: 30
